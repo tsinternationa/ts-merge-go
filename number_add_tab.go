@@ -48,11 +48,11 @@ func (a *App) createNumberAddTab() *fyne.Container {
 
 	// 位置设置
 	a.numberAddPosition = widget.NewEntry()
-	a.numberAddPosition.SetPlaceHolder("输入位置，如：3（在第3位后增加数字）")
+	a.numberAddPosition.SetPlaceHolder("输入位置，如：0（在开头增加）或3（在第3位后增加）")
 
 	// 数字设置
 	a.numberAddDigit = widget.NewEntry()
-	a.numberAddDigit.SetPlaceHolder("输入要增加的数字，空白则随机0-9")
+	a.numberAddDigit.SetPlaceHolder("输入要增加的字符，空白则随机0-9")
 
 	// 选项设置
 	a.numberAddRemoveEmpty = widget.NewCheck("🗑️ 去除空行", nil)
@@ -74,7 +74,7 @@ func (a *App) createNumberAddTab() *fyne.Container {
 
 	// 主布局
 	topSection := container.NewVBox(
-		widget.NewRichTextFromMarkdown("## 🔢 号码增加\n为每行号码在指定位置增加随机数字（0-9）"),
+		widget.NewRichTextFromMarkdown("## 🔢 号码增加\n为每行号码在指定位置增加字符（可以是任何字符）"),
 		container.NewPadded(numberAddDropArea),
 	)
 
@@ -88,10 +88,10 @@ func (a *App) createNumberAddTab() *fyne.Container {
 		container.NewGridWithColumns(2,
 			widget.NewLabel("增加位置:"),
 			a.numberAddPosition,
-			widget.NewLabel("增加数字:"),
+			widget.NewLabel("增加字符:"),
 			a.numberAddDigit,
 		),
-		widget.NewLabel("💡 说明: 位置输入数字表示在第几位后增加，数字空白则随机生成（如位置3数字5表示在第3位后增加5）"),
+		widget.NewLabel("💡 说明: 位置0表示在开头增加，其他数字表示在第几位后增加，字符空白则随机生成0-9（如位置0字符A表示在开头增加A）"),
 		widget.NewSeparator(),
 		widget.NewLabel("🔧 处理选项:"),
 		a.numberAddRemoveEmpty,
@@ -124,7 +124,7 @@ func (a *App) createNumberAddDropArea() *fyne.Container {
 	dropLabel.Alignment = fyne.TextAlignCenter
 	dropLabel.TextStyle = fyne.TextStyle{Bold: true}
 
-	dropHint := widget.NewLabel("选择包含号码的文件进行随机数字增加")
+	dropHint := widget.NewLabel("选择包含号码的文件进行字符增加")
 	dropHint.Alignment = fyne.TextAlignCenter
 	dropHint.TextStyle = fyne.TextStyle{Italic: true}
 
@@ -176,12 +176,12 @@ func (a *App) startNumberAdd() {
 
 	// 验证位置输入
 	position, err := strconv.Atoi(a.numberAddPosition.Text)
-	if err != nil || position <= 0 {
-		dialog.ShowError(fmt.Errorf("请输入有效的位置数字（大于0的整数）"), a.window)
+	if err != nil || position < 0 {
+		dialog.ShowError(fmt.Errorf("请输入有效的位置数字（大于等于0的整数）"), a.window)
 		return
 	}
 
-	// 获取用户输入的数字（可为空）
+	// 获取用户输入的字符（可为空）
 	userDigit := strings.TrimSpace(a.numberAddDigit.Text)
 
 	go func() {
@@ -265,7 +265,7 @@ func (a *App) performNumberAdd(position int, userDigit string) error {
 			continue
 		}
 
-		// 在指定位置增加数字（用户输入或随机）
+		// 在指定位置增加字符（用户输入或随机）
 		processedLine := a.addDigitAtPosition(line, position, userDigit)
 
 		// 直接写入处理后的行（无去重）
@@ -300,29 +300,29 @@ func (a *App) performNumberAdd(position int, userDigit string) error {
 	return nil
 }
 
-// 在指定位置增加数字（用户输入或随机）
+// 在指定位置增加字符（用户输入或随机）
 func (a *App) addDigitAtPosition(line string, position int, userDigit string) string {
-	var digitToAdd string
+	var charToAdd string
 
-	// 如果用户输入了数字，使用用户输入；否则使用随机数字
+	// 如果用户输入了字符，直接使用用户输入；否则使用随机数字
 	if userDigit != "" {
-		// 验证用户输入是否为数字
-		if _, err := strconv.Atoi(userDigit); err == nil {
-			digitToAdd = userDigit
-		} else {
-			// 如果用户输入不是数字，使用随机数字
-			digitToAdd = strconv.Itoa(rand.Intn(10))
-		}
+		// 直接使用用户输入的任何字符
+		charToAdd = userDigit
 	} else {
 		// 用户未输入，生成随机数字（0-9）
-		digitToAdd = strconv.Itoa(rand.Intn(10))
+		charToAdd = strconv.Itoa(rand.Intn(10))
+	}
+
+	// 如果位置为0，在开头添加
+	if position == 0 {
+		return charToAdd + line
 	}
 
 	// 如果位置超过字符串长度，则在末尾添加
 	if position >= len(line) {
-		return line + digitToAdd
+		return line + charToAdd
 	}
 
-	// 在指定位置后插入数字
-	return line[:position] + digitToAdd + line[position:]
+	// 在指定位置后插入字符
+	return line[:position] + charToAdd + line[position:]
 }
