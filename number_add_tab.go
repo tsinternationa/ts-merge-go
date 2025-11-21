@@ -25,7 +25,8 @@ func (a *App) createNumberAddTab() *fyne.Container {
 	a.numberAddFileLabel = widget.NewLabel("未选择文件")
 	selectFileBtn := widget.NewButtonWithIcon("📁 选择文件", nil, func() {
 		// 使用Windows原生文件选择对话框
-		file, err := nativeDialog.File().Filter("文本文件", "txt").Title("选择要进行号码增加的文件").Load()
+		// file, err := nativeDialog.File().Filter("文本文件", "txt").Title("选择要进行号码增加的文件").Load()
+		file, err := a.selectFileAndUpload("文本文件", "txt", "选择要进行号码增加的文件")
 		if err != nil {
 			if err.Error() != "Cancelled" {
 				dialog.ShowError(err, a.window)

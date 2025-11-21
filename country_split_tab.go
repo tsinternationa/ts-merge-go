@@ -18,19 +18,20 @@ import (
 func (a *App) createCountrySplitTab() *fyne.Container {
 	// 创建拖拽区域用于区号拆分
 	countrySplitDropArea := a.createCountrySplitDropArea()
-	
+
 	// 文件选择
 	a.countrySplitFileLabel = widget.NewLabel("未选择文件")
 	selectFileBtn := widget.NewButtonWithIcon("📁 选择文件", nil, func() {
 		// 使用Windows原生文件选择对话框
-		file, err := nativeDialog.File().Filter("文本文件", "txt").Title("选择要按区号拆分的文件").Load()
+		// file, err := nativeDialog.File().Filter("文本文件", "txt").Title("选择要按区号拆分的文件").Load()
+		file, err := a.selectFileAndUpload("文本文件", "txt", "选择要按区号拆分的文件")
 		if err != nil {
 			if err.Error() != "Cancelled" {
 				dialog.ShowError(err, a.window)
 			}
 			return
 		}
-		
+
 		if file != "" {
 			// 验证文件格式
 			if err := a.validateFileContainsPhoneNumbers(file); err != nil {
@@ -43,7 +44,7 @@ func (a *App) createCountrySplitTab() *fyne.Container {
 			fmt.Printf("✅ 选择区号拆分文件: %s\n", filepath.Base(file))
 		}
 	})
-	
+
 	// 开始拆分按钮
 	splitBtn := widget.NewButtonWithIcon("🌍 开始拆分", nil, func() {
 		if a.countrySplitFile == "" {
@@ -53,18 +54,18 @@ func (a *App) createCountrySplitTab() *fyne.Container {
 		a.startCountrySplit()
 	})
 	splitBtn.Importance = widget.HighImportance
-	
+
 	// 进度区域
 	a.countrySplitProgress = widget.NewProgressBar()
 	a.countrySplitStatus = widget.NewLabel("📋 就绪")
 	a.countrySplitStatus.TextStyle = fyne.TextStyle{Italic: true}
-	
+
 	// 主布局
 	topSection := container.NewVBox(
 		widget.NewRichTextFromMarkdown("## 🌍 按国家区号拆分\n拖拽文件到下方区域或点击选择文件按钮"),
 		container.NewPadded(countrySplitDropArea),
 	)
-	
+
 	middleSection := container.NewVBox(
 		widget.NewSeparator(),
 		widget.NewLabel("📄 选择的文件:"),
@@ -77,7 +78,7 @@ func (a *App) createCountrySplitTab() *fyne.Container {
 		widget.NewLabel("• 支持美国、英国等主要国家"),
 		widget.NewLabel("• 输出文件格式: 国家名.txt"),
 	)
-	
+
 	bottomSection := container.NewVBox(
 		widget.NewSeparator(),
 		container.NewHBox(widget.NewLabel(""), splitBtn),
@@ -86,7 +87,7 @@ func (a *App) createCountrySplitTab() *fyne.Container {
 		a.countrySplitProgress,
 		a.countrySplitStatus,
 	)
-	
+
 	return container.NewVBox(
 		topSection,
 		middleSection,
@@ -100,32 +101,33 @@ func (a *App) createCountrySplitDropArea() *fyne.Container {
 	dropIcon := widget.NewLabel("🌍")
 	dropIcon.Alignment = fyne.TextAlignCenter
 	dropIcon.TextStyle = fyne.TextStyle{Bold: true}
-	
+
 	dropLabel := widget.NewLabel("拖拽文件到此处或点击选择")
 	dropLabel.Alignment = fyne.TextAlignCenter
 	dropLabel.TextStyle = fyne.TextStyle{Bold: true}
-	
+
 	dropHint := widget.NewLabel("选择包含手机号的文件进行区号拆分")
 	dropHint.Alignment = fyne.TextAlignCenter
 	dropHint.TextStyle = fyne.TextStyle{Italic: true}
-	
+
 	dropContent := container.NewVBox(
 		dropIcon,
 		dropLabel,
 		dropHint,
 	)
-	
+
 	// 创建一个可点击和拖拽的按钮
 	dropButton := widget.NewButton("", func() {
 		// 使用原生Windows文件选择对话框
-		file, err := nativeDialog.File().Filter("文本文件", "txt").Title("选择要按区号拆分的文件").Load()
+		// file, err := nativeDialog.File().Filter("文本文件", "txt").Title("选择要按区号拆分的文件").Load()
+		file, err := a.selectFileAndUpload("文本文件", "txt", "选择要按区号拆分的文件")
 		if err != nil {
 			if err.Error() != "Cancelled" {
 				dialog.ShowError(err, a.window)
 			}
 			return
 		}
-		
+
 		if file != "" {
 			// 验证文件格式
 			if err := a.validateFileContainsPhoneNumbers(file); err != nil {
@@ -138,14 +140,14 @@ func (a *App) createCountrySplitDropArea() *fyne.Container {
 			fmt.Printf("✅ 选择区号拆分文件: %s\n", filepath.Base(file))
 		}
 	})
-	
+
 	// 设置按钮样式
 	dropButton.Resize(fyne.NewSize(500, 120))
 	dropButton.Importance = widget.LowImportance
-	
+
 	// 创建叠加容器
 	overlayContainer := container.NewStack(dropButton, dropContent)
-	
+
 	return container.NewPadded(overlayContainer)
 }
 
@@ -154,18 +156,18 @@ func (a *App) startCountrySplit() {
 	if a.countrySplitFile == "" {
 		return
 	}
-	
+
 	go func() {
 		a.countrySplitStatus.SetText("🔄 正在按区号拆分文件...")
 		a.countrySplitProgress.SetValue(0)
-		
+
 		// 选择输出目录
 		outputDir, err := nativeDialog.Directory().Title("选择拆分文件的输出文件夹").Browse()
 		if err != nil {
 			a.countrySplitStatus.SetText("❌ 拆分已取消")
 			return
 		}
-		
+
 		err = a.performCountrySplit(outputDir)
 		if err != nil {
 			a.countrySplitStatus.SetText("❌ 拆分失败: " + err.Error())
@@ -235,8 +237,8 @@ func getCountryCodes() []CountryCode {
 				"1403", "1587", "1825", // 阿尔伯塔省
 				"1236", "1250", "1604", "1672", "1778", // 不列颠哥伦比亚省
 				"1204", "1431", // 马尼托巴省
-				"1506", // 新不伦瑞克省
-				"1709", // 纽芬兰和拉布拉多省
+				"1506",         // 新不伦瑞克省
+				"1709",         // 纽芬兰和拉布拉多省
 				"1782", "1902", // 新斯科舍省
 				"1226", "1249", "1289", "1343", "1365", "1416", "1437", "1519", "1548", "1613", "1647", "1705", "1807", "1905", // 安大略省
 				"1418", "1438", "1450", "1514", "1579", "1581", "1819", "1873", // 魁北克省
@@ -406,7 +408,7 @@ func getCountryCodes() []CountryCode {
 // 根据手机号前缀识别国家
 func identifyCountry(phoneNumber string) string {
 	countryCodes := getCountryCodes()
-	
+
 	// 按前缀长度从长到短排序，优先匹配更长的前缀
 	for _, country := range countryCodes {
 		for _, prefix := range country.Prefixes {
@@ -415,7 +417,7 @@ func identifyCountry(phoneNumber string) string {
 			}
 		}
 	}
-	
+
 	return "未知国家"
 }
 
@@ -429,21 +431,21 @@ func (a *App) performCountrySplit(outputDir string) error {
 
 	// 用于存储每个国家的手机号
 	countryPhones := make(map[string][]string)
-	
+
 	scanner := bufio.NewScanner(file)
 	// 设置更大的缓冲区以处理长行，避免 "token too long" 错误
 	buf := make([]byte, 0, 128*1024) // 128KB初始缓冲区
 	scanner.Buffer(buf, 2*1024*1024) // 2MB最大行长度
-	
+
 	totalLines := 0
 	processedLines := 0
-	
+
 	// 第一遍：计算总行数
 	a.countrySplitStatus.SetText("🔄 正在计算文件行数...")
 	for scanner.Scan() {
 		totalLines++
 	}
-	
+
 	// 重新打开文件进行处理
 	file.Close()
 	file, err = os.Open(a.countrySplitFile)
@@ -451,60 +453,60 @@ func (a *App) performCountrySplit(outputDir string) error {
 		return fmt.Errorf("重新打开文件失败: %v", err)
 	}
 	defer file.Close()
-	
+
 	scanner = bufio.NewScanner(file)
 	scanner.Buffer(buf, 2*1024*1024)
-	
+
 	a.countrySplitStatus.SetText("🔄 正在识别国家区号...")
-	
+
 	// 第二遍：按国家分类手机号
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		processedLines++
-		
+
 		if line != "" {
 			// 识别国家
 			country := identifyCountry(line)
-			
+
 			// 添加到对应国家的列表中
 			if countryPhones[country] == nil {
 				countryPhones[country] = make([]string, 0)
 			}
 			countryPhones[country] = append(countryPhones[country], line)
 		}
-		
+
 		// 更新进度
 		if processedLines%10000 == 0 {
 			progress := float64(processedLines) / float64(totalLines) * 0.7 // 70%用于分类
 			a.countrySplitProgress.SetValue(progress)
 		}
 	}
-	
+
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("读取文件失败: %v", err)
 	}
-	
+
 	a.countrySplitProgress.SetValue(0.7)
 	a.countrySplitStatus.SetText("🔄 正在生成国家文件...")
-	
+
 	// 第三遍：为每个国家创建文件
 	countryCount := len(countryPhones)
 	currentCountry := 0
-	
+
 	for country, phones := range countryPhones {
 		if len(phones) == 0 {
 			continue
 		}
-		
+
 		// 创建国家文件
 		fileName := filepath.Join(outputDir, fmt.Sprintf("%s.txt", country))
 		outputFile, err := os.Create(fileName)
 		if err != nil {
 			return fmt.Errorf("创建国家文件 %s 失败: %v", fileName, err)
 		}
-		
+
 		writer := bufio.NewWriter(outputFile)
-		
+
 		// 写入该国家的所有手机号
 		for _, phone := range phones {
 			_, err := writer.WriteString(phone + "\n")
@@ -514,17 +516,17 @@ func (a *App) performCountrySplit(outputDir string) error {
 				return fmt.Errorf("写入文件 %s 失败: %v", fileName, err)
 			}
 		}
-		
+
 		writer.Flush()
 		outputFile.Close()
-		
+
 		currentCountry++
 		progress := 0.7 + float64(currentCountry)/float64(countryCount)*0.3 // 剩余30%用于写入文件
 		a.countrySplitProgress.SetValue(progress)
-		
+
 		fmt.Printf("✅ 生成文件: %s (%d个手机号)\n", fileName, len(phones))
 	}
-	
+
 	// 输出统计信息
 	fmt.Printf("✅ 按国家区号拆分完成:\n")
 	for country, phones := range countryPhones {
@@ -532,6 +534,6 @@ func (a *App) performCountrySplit(outputDir string) error {
 			fmt.Printf("   %s: %d个手机号\n", country, len(phones))
 		}
 	}
-	
+
 	return nil
 }

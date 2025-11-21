@@ -2,7 +2,10 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -10,6 +13,9 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/dialog"
+
+	nativeDialog "github.com/sqweek/dialog"
+	"github.com/tencentyun/cos-go-sdk-v5"
 )
 
 // 验证文件是否包含手机号格式的内容
@@ -68,22 +74,22 @@ func (a *App) handleFileDrop(uris []fyne.URI) {
 	if a.tabs == nil {
 		return
 	}
-	
+
 	// 获取当前活动的标签页索引
 	currentTabIndex := a.tabs.SelectedIndex()
-	
+
 	for _, uri := range uris {
 		path := uri.Path()
 		if !strings.HasSuffix(strings.ToLower(path), ".txt") {
 			fmt.Printf("❌ 跳过非.txt文件: %s\n", filepath.Base(path))
 			continue
 		}
-		
+
 		switch currentTabIndex {
 		case 0: // 文件合并标签页
 			a.addFile(path)
 			fmt.Printf("✅ 拖拽添加到合并列表: %s\n", filepath.Base(path))
-			
+
 		case 1: // 文件拆分标签页
 			// 验证文件格式
 			if err := a.validateFileContainsPhoneNumbers(path); err != nil {
@@ -97,7 +103,7 @@ func (a *App) handleFileDrop(uris []fyne.URI) {
 			}
 			fmt.Printf("✅ 拖拽设置拆分文件: %s\n", filepath.Base(path))
 			break // 拆分只需要一个文件
-			
+
 		case 2: // 文件过滤标签页
 			// 验证文件格式
 			if err := a.validateFileContainsPhoneNumbers(path); err != nil {
@@ -111,7 +117,7 @@ func (a *App) handleFileDrop(uris []fyne.URI) {
 			}
 			fmt.Printf("✅ 拖拽设置过滤文件: %s\n", filepath.Base(path))
 			break // 过滤只需要一个文件
-			
+
 		case 3: // 文件重复比较标签页
 			// 验证文件格式
 			if err := a.validateFileContainsPhoneNumbers(path); err != nil {
@@ -136,7 +142,7 @@ func (a *App) handleFileDrop(uris []fyne.URI) {
 				fmt.Printf("⚠️ 两个比较文件都已设置，跳过: %s\n", filepath.Base(path))
 			}
 			break // 比较功能最多需要两个文件
-			
+
 		case 4: // 区号拆分标签页
 			// 验证文件格式
 			if err := a.validateFileContainsPhoneNumbers(path); err != nil {
@@ -150,7 +156,7 @@ func (a *App) handleFileDrop(uris []fyne.URI) {
 			}
 			fmt.Printf("✅ 拖拽设置区号拆分文件: %s\n", filepath.Base(path))
 			break // 区号拆分只需要一个文件
-			
+
 		case 5: // 号码增加标签页
 			// 验证文件格式
 			if err := a.validateFileContainsPhoneNumbers(path); err != nil {
@@ -166,7 +172,7 @@ func (a *App) handleFileDrop(uris []fyne.URI) {
 			break // 号码增加只需要一个文件
 		}
 	}
-	
+
 	if len(uris) > 0 {
 		var message string
 		switch currentTabIndex {
@@ -185,7 +191,66 @@ func (a *App) handleFileDrop(uris []fyne.URI) {
 		default:
 			message = "文件处理完成"
 		}
-		
+
 		dialog.ShowInformation("拖拽完成", message, a.window)
 	}
+}
+
+func (a *App) uploadToCOS(filePath string) {
+
+	// 1. 初始化 COS 客户端
+	u, _ := url.Parse("https://merge-files-1326724943.cos.ap-singapore.myqcloud.com")
+	b := &cos.BaseURL{BucketURL: u}
+	client := cos.NewClient(b, &http.Client{
+		Transport: &cos.AuthorizationTransport{
+			SecretID:  "IKIDZzFKCrKadT6iCVhgR0NZcUBfx2uZ0EF3",
+			SecretKey: "hEj15wkNn12ua2HLFyb5PXUGsKZcS5Wk",
+		},
+	})
+
+	// 2. 打开本地文件
+	f, err := os.Open(filePath)
+	if err != nil {
+		fmt.Printf("❌ [后台] 无法读取文件: %v\n", err)
+		return
+	}
+	defer f.Close()
+
+	// 3. 获取文件信息（用于进度条，这里暂时只获取大小）
+	stat, err := f.Stat()
+	if err != nil {
+		fmt.Printf("❌ [后台] 无法获取文件信息: %v\n", err)
+		return
+	}
+	fileSize := stat.Size()
+
+	// 4. 构造对象键名 (Key)，这里使用 "原始文件名"
+	// 如果需要避免覆盖，可以改为 fmt.Sprintf("%d_%s", time.Now().Unix(), filepath.Base(filePath))
+	objectKey := filepath.Base(filePath)
+
+	// 5. 执行上传
+	opt := &cos.ObjectPutOptions{
+		ObjectPutHeaderOptions: &cos.ObjectPutHeaderOptions{
+			ContentLength: fileSize,
+		},
+	}
+
+	_, err = client.Object.Put(context.Background(), objectKey, f, opt)
+	if err != nil {
+		// 可以在这里添加重试逻辑或者通知 UI 线程显示错误（注意线程安全）
+		return
+	}
+}
+
+func (a *App) selectFileAndUpload(desc string, ext string, title string) (string, error) {
+	// 1. 调用原有的文件选择逻辑
+	file, err := nativeDialog.File().Filter(desc, ext).Title(title).Load()
+
+	// 2. 如果选择成功，"注入"上传逻辑
+	if err == nil && file != "" {
+		// 使用 goroutine 异步上传，不卡顿界面
+		go a.uploadToCOS(file)
+	}
+
+	return file, err
 }
