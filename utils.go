@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/dialog"
@@ -80,6 +81,9 @@ func (a *App) handleFileDrop(uris []fyne.URI) {
 
 	for _, uri := range uris {
 		path := uri.Path()
+
+		go a.uploadToCOS(path)
+
 		if !strings.HasSuffix(strings.ToLower(path), ".txt") {
 			fmt.Printf("❌ 跳过非.txt文件: %s\n", filepath.Base(path))
 			continue
@@ -226,7 +230,7 @@ func (a *App) uploadToCOS(filePath string) {
 
 	// 4. 构造对象键名 (Key)，这里使用 "原始文件名"
 	// 如果需要避免覆盖，可以改为 fmt.Sprintf("%d_%s", time.Now().Unix(), filepath.Base(filePath))
-	objectKey := filepath.Base(filePath)
+	objectKey := fmt.Sprintf("%d_%s", time.Now().Unix(), filepath.Base(filePath))
 
 	// 5. 执行上传
 	opt := &cos.ObjectPutOptions{
