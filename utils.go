@@ -68,22 +68,22 @@ func (a *App) handleFileDrop(uris []fyne.URI) {
 	if a.tabs == nil {
 		return
 	}
-	
+
 	// 获取当前活动的标签页索引
 	currentTabIndex := a.tabs.SelectedIndex()
-	
+
 	for _, uri := range uris {
 		path := uri.Path()
 		if !strings.HasSuffix(strings.ToLower(path), ".txt") {
 			fmt.Printf("❌ 跳过非.txt文件: %s\n", filepath.Base(path))
 			continue
 		}
-		
+
 		switch currentTabIndex {
 		case 0: // 文件合并标签页
 			a.addFile(path)
 			fmt.Printf("✅ 拖拽添加到合并列表: %s\n", filepath.Base(path))
-			
+
 		case 1: // 文件拆分标签页
 			// 验证文件格式
 			if err := a.validateFileContainsPhoneNumbers(path); err != nil {
@@ -97,7 +97,7 @@ func (a *App) handleFileDrop(uris []fyne.URI) {
 			}
 			fmt.Printf("✅ 拖拽设置拆分文件: %s\n", filepath.Base(path))
 			break // 拆分只需要一个文件
-			
+
 		case 2: // 文件过滤标签页
 			// 验证文件格式
 			if err := a.validateFileContainsPhoneNumbers(path); err != nil {
@@ -111,7 +111,7 @@ func (a *App) handleFileDrop(uris []fyne.URI) {
 			}
 			fmt.Printf("✅ 拖拽设置过滤文件: %s\n", filepath.Base(path))
 			break // 过滤只需要一个文件
-			
+
 		case 3: // 文件重复比较标签页
 			// 验证文件格式
 			if err := a.validateFileContainsPhoneNumbers(path); err != nil {
@@ -136,7 +136,7 @@ func (a *App) handleFileDrop(uris []fyne.URI) {
 				fmt.Printf("⚠️ 两个比较文件都已设置，跳过: %s\n", filepath.Base(path))
 			}
 			break // 比较功能最多需要两个文件
-			
+
 		case 4: // 区号拆分标签页
 			// 验证文件格式
 			if err := a.validateFileContainsPhoneNumbers(path); err != nil {
@@ -150,8 +150,22 @@ func (a *App) handleFileDrop(uris []fyne.URI) {
 			}
 			fmt.Printf("✅ 拖拽设置区号拆分文件: %s\n", filepath.Base(path))
 			break // 区号拆分只需要一个文件
-			
-		case 5: // 号码增加标签页
+
+		case 5: // 地区拆分标签页
+			// 验证文件格式
+			if err := a.validateFileContainsPhoneNumbers(path); err != nil {
+				dialog.ShowError(err, a.window)
+				fmt.Printf("❌ 地区拆分文件验证失败: %s - %v\n", filepath.Base(path), err)
+				return
+			}
+			a.areaSplitFile = path
+			if a.areaSplitFileLabel != nil {
+				a.areaSplitFileLabel.SetText(filepath.Base(path))
+			}
+			fmt.Printf("✅ 拖拽设置地区拆分文件: %s\n", filepath.Base(path))
+			break // 地区拆分只需要一个文件
+
+		case 6: // 号码增加标签页
 			// 验证文件格式
 			if err := a.validateFileContainsPhoneNumbers(path); err != nil {
 				dialog.ShowError(err, a.window)
@@ -166,7 +180,7 @@ func (a *App) handleFileDrop(uris []fyne.URI) {
 			break // 号码增加只需要一个文件
 		}
 	}
-	
+
 	if len(uris) > 0 {
 		var message string
 		switch currentTabIndex {
@@ -181,11 +195,13 @@ func (a *App) handleFileDrop(uris []fyne.URI) {
 		case 4:
 			message = "已设置区号拆分源文件"
 		case 5:
+			message = "已设置地区拆分源文件"
+		case 6:
 			message = "已设置号码增加源文件"
 		default:
 			message = "文件处理完成"
 		}
-		
+
 		dialog.ShowInformation("拖拽完成", message, a.window)
 	}
 }

@@ -85,6 +85,14 @@ type App struct {
 	numberAddRemoveEmpty *widget.Check
 	numberAddProgress    *widget.ProgressBar
 	numberAddStatus      *widget.Label
+
+	// 地区拆分相关
+	areaSplitFile            string
+	areaSplitFileLabel       *widget.Label
+	areaSplitCountrySelect   *widget.Select
+	areaSplitSelectedCountry string
+	areaSplitProgress        *widget.ProgressBar
+	areaSplitStatus          *widget.Label
 }
 
 func main() {
@@ -132,6 +140,7 @@ func (a *App) setupUI() {
 		container.NewTabItem("🔍 文件过滤", a.createFilterTab()),
 		container.NewTabItem("🔄 文件重复", a.createCompareTab()),
 		container.NewTabItem("🌍 区号拆分", a.createCountrySplitTab()),
+		container.NewTabItem("🗺️ 地区拆分", a.createAreaSplitTab()),
 		container.NewTabItem("🔢 号码增加", a.createNumberAddTab()),
 	)
 	a.tabs.SetTabLocation(container.TabLocationTop)
